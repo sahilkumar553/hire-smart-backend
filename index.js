@@ -13,6 +13,7 @@ import notificationRoutes from "./routes/notification.routes.js";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import session from 'express-session';
 import passport from 'passport';
+import MongoStore from 'connect-mongo';
 
 dotenv.config({});
 
@@ -39,16 +40,27 @@ app.use(express.static('public'));
 app.use(bodyParser.json()); // To handle JSON body
 
 app.use(bodyParser.urlencoded({extended: true}));
+
+// Session configuration with MongoDB store
 app.use(session({
-	secret:"This is the secret key",
-	resave:false,
-	saveUninitialized:false
+    secret: process.env.SESSION_SECRET || "This is the secret key",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGO_URI,
+        ttl: 24 * 60 * 60, // Session TTL (1 day)
+        autoRemove: 'native',
+        touchAfter: 24 * 3600 // Time period in seconds to force session update
+    }),
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+    }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-
 
 async function runChat(userInput) {
 	const genAI = new GoogleGenerativeAI(API_KEY);
@@ -132,8 +144,6 @@ async function runChat(userInput) {
 	  res.status(500).json({ error: 'Internal Server Error' });
 	}
   });
-
-
 
 // api's
 app.use("/api/v1/user", userRoute);
