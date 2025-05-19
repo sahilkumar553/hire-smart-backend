@@ -94,6 +94,14 @@ export const login = async (req, res) => {
         
         const token = await jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: '1d' });
 
+        // Set secure cookie options for cross-origin
+        const cookieOptions = {
+            maxAge: 1 * 24 * 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        };
+
         user = {
             _id: user._id,
             fullname: user.fullname,
@@ -103,24 +111,47 @@ export const login = async (req, res) => {
             profile: user.profile
         }
 
-        return res.status(200).cookie("token", token, { maxAge: 1 * 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'strict' }).json({
-            message: `Welcome back ${user.fullname}`,
-            user,
-            success: true
-        });
+        // Set cookie and also include token in response body for cross-domain access
+        return res.status(200)
+            .cookie("token", token, cookieOptions)
+            .json({
+                message: `Welcome back ${user.fullname}`,
+                user,
+                token, // Include token in response
+                success: true
+            });
     } catch (error) {
-        console.log(error);
+        console.error("Login error:", error);
+        return res.status(500).json({
+            message: "Server error during login",
+            success: false
+        });
     }
 }
 
 export const logout = async (req, res) => {
     try {
-        return res.status(200).cookie("token", "", { maxAge: 0 }).json({
-            message: "Logged out successfully.",
-            success: true
-        });
+        // Set secure cookie options for cross-origin
+        const cookieOptions = {
+            maxAge: 0,
+            httpOnly: true,
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        };
+        
+        // Clear the cookie and also tell client to remove localStorage token
+        return res.status(200)
+            .cookie("token", "", cookieOptions)
+            .json({
+                message: "Logged out successfully.",
+                success: true
+            });
     } catch (error) {
-        console.log(error);
+        console.error("Logout error:", error);
+        return res.status(500).json({
+            message: "Server error during logout",
+            success: false
+        });
     }
 }
 
