@@ -25,9 +25,11 @@ app.use(express.urlencoded({extended:true}));
 app.use(cookieParser());
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? [process.env.FRONTEND_URL, 'https://*.railway.app'] 
+        ? ['https://hire-smart-frontend.vercel.app', process.env.FRONTEND_URL] 
         : 'http://localhost:5173',
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }
 
 app.use(cors(corsOptions));
@@ -54,6 +56,7 @@ app.use(session({
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
