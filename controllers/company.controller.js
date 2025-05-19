@@ -11,32 +11,64 @@ export const registerCompany = async (req, res) => {
                 success: false
             });
         }
-        let company = await Company.findOne({ name: companyName });
-        if (company) {
-            return res.status(400).json({
-                message: "You can't register same company.",
+
+        if (!req.id) {
+            return res.status(401).json({
+                message: "User not authenticated.",
                 success: false
-            })
-        };
-        company = await Company.create({
+            });
+        }
+
+        // Check if user already has a company
+        const existingCompany = await Company.findOne({ user: req.id });
+        if (existingCompany) {
+            return res.status(400).json({
+                message: "You already have a registered company.",
+                success: false
+            });
+        }
+
+        // Check if company name is already taken
+        const companyWithSameName = await Company.findOne({ name: companyName });
+        if (companyWithSameName) {
+            return res.status(400).json({
+                message: "Company name is already taken.",
+                success: false
+            });
+        }
+
+        const company = await Company.create({
             name: companyName,
-            userId: req.id
+            user: req.id
         });
 
         return res.status(201).json({
             message: "Company registered successfully.",
             company,
             success: true
-        })
+        });
     } catch (error) {
-        console.log(error);
+        console.error('Error in registerCompany:', error);
+        return res.status(500).json({
+            message: "Error registering company.",
+            error: error.message,
+            success: false
+        });
     }
 }
+
 export const getCompany = async (req, res) => {
     try {
-        const userId = req.id; // logged in user id
-        const companies = await Company.find({ userId });
-        if (!companies) {
+        if (!req.id) {
+            return res.status(401).json({
+                message: "User not authenticated.",
+                success: false
+            });
+        }
+
+        const userId = req.id;
+        const companies = await Company.find({ user: userId });
+        if (!companies || companies.length === 0) {
             return res.status(404).json({
                 message: "Companies not found.",
                 success: false
@@ -44,12 +76,18 @@ export const getCompany = async (req, res) => {
         }
         return res.status(200).json({
             companies,
-            success:true
+            success: true
         })
     } catch (error) {
-        console.log(error);
+        console.error('Error in getCompany:', error);
+        return res.status(500).json({
+            message: "Error fetching companies.",
+            error: error.message,
+            success: false
+        });
     }
 }
+
 // get company by id
 export const getCompanyById = async (req, res) => {
     try {
@@ -69,6 +107,7 @@ export const getCompanyById = async (req, res) => {
         console.log(error);
     }
 }
+
 export const updateCompany = async (req, res) => {
     try {
         const { name, description, website, location } = req.body;

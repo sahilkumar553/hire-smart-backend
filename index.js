@@ -13,6 +13,7 @@ import notificationRoutes from "./routes/notification.routes.js";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import session from 'express-session';
 import passport from 'passport';
+import mongoose from 'mongoose';
 
 dotenv.config({});
 
@@ -23,8 +24,10 @@ app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(cookieParser());
 const corsOptions = {
-    origin:'http://localhost:5173',
-    credentials:true
+    origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.FRONTEND_URL, 'https://*.railway.app'] 
+        : 'http://localhost:5173',
+    credentials: true
 }
 
 app.use(cors(corsOptions));
@@ -33,6 +36,11 @@ const PORT = process.env.PORT || 3000;
 
 const MODEL_NAME = "gemini-1.5-flash";
 const API_KEY = process.env.API_KEY_G;
+if (!API_KEY) {
+    console.error('API_KEY_G is not set in environment variables');
+    process.exit(1);
+}
+
 app.set('view engine','ejs');
 app.use(express.static('public'));
 // Middleware to handle HTTP post requests
@@ -40,9 +48,14 @@ app.use(bodyParser.json()); // To handle JSON body
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(session({
-	secret:"This is the secret key",
-	resave:false,
-	saveUninitialized:false
+    secret: process.env.SESSION_SECRET || 'default-secret-key-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
 }));
 
 app.use(passport.initialize());
@@ -143,10 +156,38 @@ app.use("/api/v1/application", applicationRoute);
 app.use('/api/v1/payment', paymentRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 
+// Health check route
+app.get('/health', async (req, res) => {
+    try {
+        // Check database connection
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error('Database not connected');
+        }
+        res.json({ 
+            status: 'healthy',
+            database: 'connected',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+app.get('/', (req, res) => {
+    res.send('Backend is running');
+});
 
 
-
-app.listen(PORT,()=>{
-    connectDB();
-    console.log(`Server running at port ${PORT}`);
-})
+app.listen(PORT, async () => {
+    try {
+        await connectDB();
+        console.log(`Server running at port ${PORT}`);
+    } catch (error) {
+        console.error('Failed to connect to database:', error);
+        process.exit(1);
+    }
+});
