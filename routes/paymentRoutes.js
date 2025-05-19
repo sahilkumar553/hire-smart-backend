@@ -4,7 +4,7 @@ import isAuthenticated from '../middlewares/isAuthenticated.js';
 import { Application } from '../models/application.model.js';
 
 const router = express.Router();
-const stripe = new Stripe('sk_test_51PA7DZJ4JtpKs8bKH70GloKeotr8A9igZgL7k2xes6JFzaT0BYbjr3rlfPtDYMl4c2UCFAN3GppVojVDs5KVKgKW00l2lV4cny'); // Replace with your test secret key
+const stripe = new Stripe('pk_test_51RIxplRNIwrvZLG6djrMzc4HNeRcP6ePGd0ABHwrR8HDpnoho90N2XW8gO07ECXbdM952vtgC71MBUZx4NyLWhxs00xKmzRtVQ'); // Replace with your test secret key
 
 router.post('/pay/:applicationId', isAuthenticated, async (req, res) => {
   const { applicationId } = req.params;
