@@ -180,6 +180,80 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// After the health check route, add a debug endpoint to list all routes
+app.get('/api/debug/routes', (req, res) => {
+    const routes = [];
+    
+    // Function to collect routes from a router
+    const extractRoutes = (router) => {
+        if (!router.stack) return;
+        
+        router.stack.forEach((layer) => {
+            if (layer.route) {
+                // This is a route
+                const path = layer.route.path;
+                const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase());
+                routes.push({ path, methods });
+            } else if (layer.name === 'router' && layer.handle.stack) {
+                // This is a router middleware
+                extractRoutes(layer.handle);
+            }
+        });
+    };
+    
+    // Get routes from the main app
+    extractRoutes(app._router);
+    
+    res.json({
+        total_routes: routes.length,
+        routes,
+        registered_middleware: [
+            "/api/v1/user",
+            "/api/v1/company",
+            "/api/v1/job",
+            "/api/v1/application",
+            "/api/v1/payment",
+            "/api/v1/notifications"
+        ]
+    });
+});
+
+// Add the test company route
+app.get('/api/test/company', async (req, res) => {
+    try {
+        res.json({ 
+            message: 'Company API test endpoint',
+            company_routes: [
+                { path: "/api/v1/company/register", method: "POST" },
+                { path: "/api/v1/company/get", method: "GET" },
+                { path: "/api/v1/company/get/:id", method: "GET" },
+                { path: "/api/v1/company/update/:id", method: "PUT" }
+            ]
+        });
+    } catch (error) {
+        console.error('Company test endpoint error:', error);
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
+// Get company route without authentication (for testing)
+app.get('/api/test/company/all', async (req, res) => {
+    try {
+        const companies = await mongoose.connection.collection('companies').find({}).toArray();
+        res.json({
+            count: companies.length,
+            companies
+        });
+    } catch (error) {
+        console.error('Error fetching companies:', error);
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('Backend is running');
 });
