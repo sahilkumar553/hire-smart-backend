@@ -237,3 +237,46 @@ export const getAllStudents = async (req, res) => {
         });
     }
 }
+
+export const getCurrentUser = async (req, res) => {
+    try {
+        const userId = req.id; // From authentication middleware
+        
+        if (!userId) {
+            return res.status(401).json({
+                message: "Authentication required",
+                success: false
+            });
+        }
+        
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+        
+        // Return user without password
+        const userData = {
+            _id: user._id,
+            fullname: user.fullname,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            role: user.role,
+            profile: user.profile
+        };
+        
+        return res.status(200).json({
+            user: userData,
+            success: true
+        });
+    } catch (error) {
+        console.error("Get current user error:", error);
+        return res.status(500).json({
+            message: "Server error while fetching user data",
+            success: false
+        });
+    }
+}
