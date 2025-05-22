@@ -14,6 +14,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import session from 'express-session';
 import passport from 'passport';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
+import client from 'prom-client';
 
 dotenv.config({});
 
@@ -25,14 +27,22 @@ app.use(express.urlencoded({extended:true}));
 app.use(cookieParser());
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? ['https://hire-smart-frontend.vercel.app', process.env.FRONTEND_URL] 
+        ? ['https://hire-smart-frontend.vercel.app', process.env.FRONTEND_URL, 'https://hire-smart-frontend-dusky.vercel.app', '*'] 
         : 'http://localhost:5173',
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }
 
-app.use(cors(corsOptions));
+// Add CORS debug logging
+const corsMiddleware = cors(corsOptions);
+app.use((req, res, next) => {
+    console.log(`CORS request from origin: ${req.headers.origin} to ${req.method} ${req.path}`);
+    corsMiddleware(req, res, next);
+});
+
+// Add OPTIONS preflight handling for all routes
+app.options('*', cors(corsOptions));
 
 const PORT = process.env.PORT || 3000;
 
@@ -238,6 +248,55 @@ app.get('/api/test/company', async (req, res) => {
     }
 });
 
+// Add auth debug endpoint
+app.get('/api/debug/auth', async (req, res) => {
+    try {
+        // Check for token in cookies or Authorization header
+        const token = req.cookies.token || 
+            (req.headers.authorization && req.headers.authorization.startsWith('Bearer') ? 
+             req.headers.authorization.split(' ')[1] : null);
+
+        const result = {
+            headers: {
+                authorization: req.headers.authorization ? 'exists' : 'missing',
+                cookie: req.headers.cookie ? 'exists' : 'missing',
+                origin: req.headers.origin || 'missing',
+            },
+            token: token ? {
+                exists: true,
+                prefix: token.substring(0, 10) + '...',
+            } : {
+                exists: false
+            }
+        };
+
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.SECRET_KEY);
+                result.token.valid = true;
+                result.token.decoded = {
+                    userId: decoded.userId,
+                    exp: new Date(decoded.exp * 1000).toISOString(),
+                    iat: new Date(decoded.iat * 1000).toISOString()
+                };
+            } catch (jwtError) {
+                result.token.valid = false;
+                result.token.error = jwtError.message;
+            }
+        }
+
+        return res.status(200).json({
+            message: 'Auth debug info',
+            ...result
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Error in auth debug endpoint',
+            error: error.message
+        });
+    }
+});
+
 // Get company route without authentication (for testing)
 app.get('/api/test/company/all', async (req, res) => {
     try {
@@ -258,6 +317,19 @@ app.get('/', (req, res) => {
     res.send('Backend is running');
 });
 
+// Prometheus metrics setup
+const collectDefaultMetrics = client.collectDefaultMetrics;
+collectDefaultMetrics(); // collects Node.js and process metrics
+
+// Expose /metrics endpoint for Prometheus to scrape
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', client.register.contentType);
+        res.end(await client.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
 
 app.listen(PORT, async () => {
     try {

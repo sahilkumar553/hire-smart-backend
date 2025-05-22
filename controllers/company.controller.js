@@ -66,18 +66,15 @@ export const getCompany = async (req, res) => {
             });
         }
 
+        console.log('getCompany called for user:', req.id);
         const userId = req.id;
         const companies = await Company.find({ user: userId });
-        if (!companies || companies.length === 0) {
-            return res.status(404).json({
-                message: "Companies not found.",
-                success: false
-            })
-        }
+        
+        // Return empty array instead of 404 when no companies found
         return res.status(200).json({
-            companies,
+            companies: companies || [],
             success: true
-        })
+        });
     } catch (error) {
         console.error('Error in getCompany:', error);
         return res.status(500).json({

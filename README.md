@@ -74,3 +74,4 @@ The API will be available at `http://localhost:5000` (or your configured PORT).
 - All sensitive information is stored in environment variables
 - JWT is used for authentication
 - CORS is enabled for security # hire-smart-backend
+ 
