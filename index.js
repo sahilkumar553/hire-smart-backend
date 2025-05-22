@@ -344,7 +344,6 @@ app.post('/login', (req, res) => {
 });
 
 
-const client = require('prom-client');
 // Create a counter metric for total requests
 const totalRequests = new client.Counter({
   name: 'http_requests_total',
