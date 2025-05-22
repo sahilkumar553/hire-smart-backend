@@ -339,12 +339,22 @@ const loginCounter = new client.Counter({
 });
 
 app.post('/login', (req, res) => {
-  // Your login logic here
-
-  // Increment login counter on successful login
-  loginCounter.inc();
-
+  loginCounter.inc(); // Increment the login counter
   res.send('Logged in');
+});
+
+const express = require('express');
+const client = require('prom-client');
+// Create a counter metric for total requests
+const totalRequests = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+});
+
+// Middleware to count all requests
+app.use((req, res, next) => {
+  totalRequests.inc();  // Increment counter by 1
+  next();
 });
 
 app.listen(PORT, async () => {
