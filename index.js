@@ -331,6 +331,22 @@ app.get('/metrics', async (req, res) => {
     }
 });
 
+// Create a counter metric for login count
+
+const loginCounter = new client.Counter({
+  name: 'user_login_total',
+  help: 'Total number of user logins',
+});
+
+app.post('/login', (req, res) => {
+  // Your login logic here
+
+  // Increment login counter on successful login
+  loginCounter.inc();
+
+  res.send('Logged in');
+});
+
 app.listen(PORT, async () => {
     try {
         await connectDB();
