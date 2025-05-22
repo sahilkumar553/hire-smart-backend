@@ -343,7 +343,7 @@ app.post('/login', (req, res) => {
   res.send('Logged in');
 });
 
-const express = require('express');
+
 const client = require('prom-client');
 // Create a counter metric for total requests
 const totalRequests = new client.Counter({
