@@ -29,7 +29,6 @@ export const postJob = async (req, res) => {
         });
 
         // Notify all students about the new job
-        // Notify all students about the new job
         const students = await User.find({ role: "student" });
 
         const notifications = students.map((student) => ({
@@ -38,8 +37,27 @@ export const postJob = async (req, res) => {
             type: "job-post"
         }));
 
-
-        await Notification.insertMany(notifications);
+        // Save notifications to database
+        const savedNotifications = await Notification.insertMany(notifications);
+        
+        // Get Socket.io instance and connected users map
+        const io = req.app.get('io');
+        const connectedUsers = req.app.get('connectedUsers');
+        
+        // Send real-time notifications to connected students
+        students.forEach((student) => {
+            const socketId = connectedUsers.get(student._id.toString());
+            if (socketId) {
+                // Find this student's notification
+                const notification = savedNotifications.find(
+                    n => n.userId.toString() === student._id.toString()
+                );
+                
+                if (notification) {
+                    io.to(socketId).emit('new_notification', notification);
+                }
+            }
+        });
 
         return res.status(201).json({
             message: "New job created successfully and labour is notified.",

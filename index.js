@@ -16,10 +16,53 @@ import passport from 'passport';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import client from 'prom-client';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config({});
 
 const app = express();
+const httpServer = createServer(app);
+
+// Socket.io setup with CORS configuration
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://hire-smart-frontend.vercel.app', process.env.FRONTEND_URL, 'https://hire-smart-frontend-dusky.vercel.app', '*'] 
+      : 'http://localhost:5173',
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Store connected users
+const connectedUsers = new Map();
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+  
+  // Handle user authentication
+  socket.on('authenticate', (userId) => {
+    if (userId) {
+      console.log(`User ${userId} authenticated`);
+      connectedUsers.set(userId, socket.id);
+      socket.userId = userId;
+    }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    if (socket.userId) {
+      connectedUsers.delete(socket.userId);
+    }
+  });
+});
+
+// Make io accessible to other modules
+app.set('io', io);
+app.set('connectedUsers', connectedUsers);
 
 // middleware
 app.use(express.json());
@@ -331,32 +374,15 @@ app.get('/metrics', async (req, res) => {
     }
 });
 
-// Create a counter metric for login count
-
-const loginCounter = new client.Counter({
-  name: 'user_login_total',
-  help: 'Total number of user logins',
+// Change app.listen to httpServer.listen
+httpServer.listen(PORT, async () => {
+    try {
+        await connectDB();
+        console.log(`Server is running on port ${PORT}`);
+    } catch (error) {
+        console.log(error);
+    }
 });
-
-app.post('/login', (req, res) => {
-  loginCounter.inc(); // Increment the login counter
-  res.send('Logged in');
-});
-
-
-// Create a counter metric for total requests
-const totalRequests = new client.Counter({
-  name: 'http_requests_total',
-  help: 'Total number of HTTP requests',
-});
-
-// Middleware to count all requests
-app.use((req, res, next) => {
-  totalRequests.inc();  // Increment counter by 1
-  next();
-});
-
-app.listen(PORT, async () => {
     try {
         await connectDB();
         console.log(`Server running at port ${PORT}`);
@@ -364,4 +390,4 @@ app.listen(PORT, async () => {
         console.error('Failed to connect to database:', error);
         process.exit(1);
     }
-});
+// Remove duplicate server start code
